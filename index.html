@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Seguimiento de Expedientes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --navy: #0f2d4a;
+    --teal: #00966f;
+    --cream: #faf9f6;
+    --paper: #ffffff;
+    --ink: #1c2b38;
+    --muted: #6b7580;
+    --border: #e3e0d8;
+    --pending: #b5602f;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: inherit; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  h1, h2, h3, .serif { font-family: 'Source Serif 4', Georgia, serif; }
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    background: none;
+  }
+  input, select {
+    font-family: inherit;
+    font-size: 14px;
+  }
+
+  /* ---- Setup / Login screens ---- */
+  .centered-screen {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 36px;
+    width: 100%;
+    max-width: 400px;
+  }
+  .card h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    color: var(--navy);
+  }
+  .card p.sub {
+    color: var(--muted);
+    margin: 0 0 24px;
+    font-size: 13.5px;
+  }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .field input {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--cream);
+  }
+  .field input:focus {
+    outline: 2px solid var(--teal);
+    outline-offset: -1px;
+  }
+  .btn-primary {
+    width: 100%;
+    padding: 10px;
+    background: var(--navy);
+    color: white;
+    border-radius: 3px;
+    font-weight: 500;
+    margin-top: 6px;
+  }
+  .btn-primary:hover { background: #163a5e; }
+  .link-btn {
+    background: none;
+    color: var(--teal);
+    font-size: 13px;
+    margin-top: 14px;
+    text-align: center;
+    width: 100%;
+  }
+  .error-msg {
+    color: var(--pending);
+    font-size: 13px;
+    margin-top: 10px;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 18px;
+    line-height: 1.6;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  .hint code {
+    background: var(--cream);
+    padding: 1px 4px;
+    border-radius: 2px;
+  }
+
+  /* ---- Main app layout ---- */
+  .app {
+    display: none;
+    height: 100%;
+    grid-template-columns: 260px 1fr;
+  }
+  .app.active { display: grid; }
+
+  .sidebar {
+    border-right: 1px solid var(--border);
+    background: var(--paper);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .sidebar-top {
+    padding: 20px 18px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-top h1 {
+    font-size: 17px;
+    color: var(--navy);
+    margin: 0 0 2px;
+  }
+  .sidebar-top .who {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 18px;
+    font-size: 13.5px;
+    color: var(--ink);
+    border-left: 3px solid transparent;
+  }
+  .nav-item:hover { background: var(--cream); }
+  .nav-item.active {
+    border-left-color: var(--teal);
+    background: var(--cream);
+    font-weight: 500;
+  }
+  .badge {
+    background: var(--pending);
+    color: white;
+    font-size: 10.5px;
+    padding: 1px 6px;
+    border-radius: 9px;
+    min-width: 16px;
+    text-align: center;
+  }
+  .section-label {
+    padding: 16px 18px 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  .client-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px 8px 18px;
+    font-size: 13.5px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+  }
+  .client-item:hover { background: var(--cream); }
+  .client-item.active {
+    border-left-color: var(--navy);
+    background: var(--cream);
+    font-weight: 500;
+  }
+  .client-item .nombre-cliente {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .delete-btn {
+    flex-shrink: 0;
+    opacity: 0;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+  .client-item:hover .delete-btn,
+  .expediente-row:hover .delete-btn,
+  .paso-item:hover .delete-btn {
+    opacity: 1;
+  }
+  .delete-btn:hover {
+    color: var(--pending);
+    background: rgba(181, 96, 47, 0.1);
+  }
+  .add-client-row {
+    padding: 8px 18px 16px;
+  }
+  .add-client-row input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 13px;
+    background: var(--cream);
+  }
+  .sidebar-bottom {
+    margin-top: auto;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+  }
+  .sidebar-bottom button {
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .sidebar-bottom button:hover { color: var(--ink); }
+
+  /* ---- Main panel ---- */
+  .main {
+    overflow-y: auto;
+    padding: 32px 40px 60px;
+  }
+  .main-header {
+    margin-bottom: 26px;
+  }
+  .main-header h2 {
+    font-size: 24px;
+    color: var(--navy);
+    margin: 0 0 4px;
+  }
+  .main-header .meta {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .empty-state {
+    color: var(--muted);
+    font-size: 14px;
+    padding: 40px 0;
+    max-width: 420px;
+  }
+
+  .expediente-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 10px 13px 16px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    background: var(--paper);
+    cursor: pointer;
+    gap: 10px;
+  }
+  .expediente-row .info { flex: 1; min-width: 0; }
+  .expediente-row .right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .expediente-row:hover { border-color: var(--teal); }
+  .expediente-row .caratula {
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+  }
+  .expediente-row .fuero {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .expediente-row .pend-count {
+    font-size: 12px;
+    color: var(--pending);
+  }
+
+  .new-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+  .new-form input, .new-form select {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--paper);
+  }
+  .new-form input[type=text] { flex: 1; min-width: 180px; }
+  .new-form button {
+    padding: 8px 16px;
+    background: var(--navy);
+    color: white;
+    border-radius: 3px;
+    font-size: 13.5px;
+    font-weight: 500;
+  }
+  .new-form button:hover { background: #163a5e; }
+
+  .back-link {
+    display: inline-block;
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .back-link:hover { color: var(--ink); }
+
+  .paso-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .paso-check {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid var(--border);
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .paso-check.done {
+    background: var(--teal);
+    border-color: var(--teal);
+    color: white;
+    font-size: 11px;
+  }
+  .paso-body { flex: 1; }
+  .paso-desc { font-size: 14.5px; }
+  .paso-desc.done { color: var(--muted); text-decoration: line-through; }
+  .paso-meta {
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    display: flex;
+    gap: 8px;
+  }
+  .tag {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+  }
+
+  .pend-group { margin-bottom: 28px; }
+  .pend-group h3 {
+    font-size: 14px;
+    color: var(--navy);
+    margin: 0 0 8px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+  }
+
+  @media (max-width: 720px) {
+    .app.active { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .sidebar.mobile-visible { display: flex; position: fixed; inset: 0; z-index: 10; }
+    .main { padding: 20px; }
+  }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ============ SETUP SCREEN ============ -->
+<div id="setup-screen" class="centered-screen">
+  <div class="card">
+    <h1>Configurar conexión</h1>
+    <p class="sub">Datos de tu proyecto Supabase (una sola vez, quedan guardados en este navegador).</p>
+    <div class="field">
+      <label>Project URL</label>
+      <input type="text" id="setup-url" placeholder="https://xxxxx.supabase.co">
+    </div>
+    <div class="field">
+      <label>Anon public key</label>
+      <input type="text" id="setup-key" placeholder="eyJhbGciOi...">
+    </div>
+    <button class="btn-primary" onclick="guardarConfig()">Guardar y continuar</button>
+    <div id="setup-error" class="error-msg"></div>
+    <div class="hint">
+      Los encontrás en tu proyecto de Supabase → <code>Project Settings → API</code>.
+      Antes de continuar, corré el script <code>schema.sql</code> en el
+      <code>SQL Editor</code> de tu proyecto.
+    </div>
+  </div>
+</div>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div id="login-screen" class="centered-screen" style="display:none">
+  <div class="card">
+    <h1 id="login-title">Iniciar sesión</h1>
+    <p class="sub">Seguimiento de expedientes</p>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="login-email">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="login-password">
+    </div>
+    <button class="btn-primary" id="login-btn" onclick="handleLogin()">Entrar</button>
+    <button class="link-btn" onclick="toggleAuthMode()" id="toggle-auth-btn">¿No tenés cuenta? Creá una</button>
+    <div id="login-error" class="error-msg"></div>
+  </div>
+</div>
+
+<!-- ============ MAIN APP ============ -->
+<div class="app" id="app">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-top">
+      <h1>Expedientes</h1>
+      <div class="who" id="who-label"></div>
+    </div>
+
+    <div class="nav-item" id="nav-pendientes" onclick="verPendientes()">
+      <span>Pendientes</span>
+      <span class="badge" id="badge-pendientes" style="display:none">0</span>
+    </div>
+
+    <div class="section-label">Clientes</div>
+    <div id="client-list"></div>
+    <div class="add-client-row">
+      <input type="text" id="new-client-input" placeholder="+ Nuevo cliente" onkeydown="if(event.key==='Enter') crearCliente()">
+    </div>
+
+    <div class="sidebar-bottom">
+      <button onclick="cerrarSesion()">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+let db = null;
+let session = null;
+let authMode = 'login'; // 'login' | 'signup'
+
+let clientes = [];
+let expedientes = [];
+let pasos = [];
+let clienteActivo = null;
+let expedienteActivo = null;
+let vista = 'pendientes'; // 'pendientes' | 'cliente' | 'expediente'
+
+// ---------- Config / bootstrap ----------
+function init() {
+  const url = localStorage.getItem('lg_supabase_url');
+  const key = localStorage.getItem('lg_supabase_key');
+  if (!url || !key) {
+    show('setup-screen');
+    return;
+  }
+  try {
+    db = window.supabase.createClient(url, key);
+  } catch (e) {
+    show('setup-screen');
+    document.getElementById('setup-error').textContent = 'Error al conectar: revisá los datos.';
+    return;
+  }
+  db.auth.getSession().then(({ data }) => {
+    session = data.session;
+    if (session) {
+      arrancarApp();
+    } else {
+      show('login-screen');
+    }
+  });
+}
+
+function show(id) {
+  ['setup-screen', 'login-screen'].forEach(s => {
+    document.getElementById(s).style.display = (s === id) ? 'flex' : 'none';
+  });
+  document.getElementById('app').classList.toggle('active', id === 'app');
+}
+
+function guardarConfig() {
+  const url = document.getElementById('setup-url').value.trim();
+  const key = document.getElementById('setup-key').value.trim();
+  const err = document.getElementById('setup-error');
+  err.textContent = '';
+  if (!url || !key) { err.textContent = 'Completá ambos campos.'; return; }
+  if (!window.supabase) {
+    err.textContent = 'No se pudo cargar la librería de Supabase (revisá tu conexión a internet y recargá la página).';
+    return;
+  }
+  try {
+    db = window.supabase.createClient(url, key);
+  } catch (e) {
+    err.textContent = 'URL o key inválida: ' + e.message;
+    return;
+  }
+  localStorage.setItem('lg_supabase_url', url);
+  localStorage.setItem('lg_supabase_key', key);
+  show('login-screen');
+}
+
+// ---------- Auth ----------
+function toggleAuthMode() {
+  authMode = authMode === 'login' ? 'signup' : 'login';
+  document.getElementById('login-title').textContent = authMode === 'login' ? 'Iniciar sesión' : 'Crear cuenta';
+  document.getElementById('login-btn').textContent = authMode === 'login' ? 'Entrar' : 'Crear cuenta';
+  document.getElementById('toggle-auth-btn').textContent = authMode === 'login'
+    ? '¿No tenés cuenta? Creá una'
+    : '¿Ya tenés cuenta? Iniciá sesión';
+  document.getElementById('login-error').textContent = '';
+}
+
+async function handleLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const err = document.getElementById('login-error');
+  err.textContent = '';
+  if (!email || !password) { err.textContent = 'Completá email y contraseña.'; return; }
+
+  const fn = authMode === 'login'
+    ? db.auth.signInWithPassword({ email, password })
+    : db.auth.signUp({ email, password });
+
+  const { data, error } = await fn;
+  if (error) { err.textContent = error.message; return; }
+  if (authMode === 'signup' && !data.session) {
+    err.textContent = 'Cuenta creada. Revisá tu email para confirmar, y después iniciá sesión.';
+    return;
+  }
+  session = data.session;
+  arrancarApp();
+}
+
+async function cerrarSesion() {
+  await db.auth.signOut();
+  session = null;
+  clientes = []; expedientes = []; pasos = [];
+  show('login-screen');
+}
+
+// ---------- App bootstrap ----------
+async function arrancarApp() {
+  show('app');
+  document.getElementById('who-label').textContent = session.user.email;
+  await cargarClientes();
+  verPendientes();
+}
+
+// ---------- Data ----------
+async function cargarClientes() {
+  const { data } = await db.from('clientes').select('*').order('nombre');
+  clientes = data || [];
+  renderSidebarClientes();
+}
+
+async function crearCliente() {
+  const input = document.getElementById('new-client-input');
+  const nombre = input.value.trim();
+  if (!nombre) return;
+  const { data, error } = await db.from('clientes').insert({ nombre }).select().single();
+  if (error) { alert(error.message); return; }
+  clientes.push(data);
+  clientes.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  input.value = '';
+  renderSidebarClientes();
+  seleccionarCliente(data.id);
+}
+
+async function eliminarCliente(id, nombre, event) {
+  event.stopPropagation();
+  const ok = confirm(`¿Eliminar al cliente "${nombre}"?\n\nEsto borra también todos sus expedientes y pasos anotados. No se puede deshacer.`);
+  if (!ok) return;
+  const { error } = await db.from('clientes').delete().eq('id', id);
+  if (error) { alert(error.message); return; }
+  clientes = clientes.filter(c => c.id !== id);
+  if (clienteActivo === id) {
+    verPendientes();
+  } else {
+    renderSidebarClientes();
+  }
+}
+
+async function seleccionarCliente(id) {
+  clienteActivo = id;
+  vista = 'cliente';
+  expedienteActivo = null;
+  renderSidebarClientes();
+  const { data } = await db.from('expedientes').select('*, pasos(estado)').eq('cliente_id', id).order('created_at', { ascending: false });
+  expedientes = data || [];
+  renderMain();
+}
+
+async function crearExpediente() {
+  const caratula = document.getElementById('new-exp-caratula').value.trim();
+  const fuero = document.getElementById('new-exp-fuero').value.trim();
+  if (!caratula) return;
+  const { data, error } = await db.from('expedientes')
+    .insert({ caratula, fuero: fuero || null, cliente_id: clienteActivo })
+    .select().single();
+  if (error) { alert(error.message); return; }
+  data.pasos = [];
+  expedientes.unshift(data);
+  renderMain();
+}
+
+async function eliminarExpediente(id, caratula, event) {
+  event.stopPropagation();
+  const ok = confirm(`¿Eliminar el expediente "${caratula}"?\n\nEsto borra también todos los pasos anotados en él. No se puede deshacer.`);
+  if (!ok) return;
+  const { error } = await db.from('expedientes').delete().eq('id', id);
+  if (error) { alert(error.message); return; }
+  expedientes = expedientes.filter(e => e.id !== id);
+  if (expedienteActivo === id) {
+    vista = 'cliente';
+    expedienteActivo = null;
+  }
+  renderMain();
+}
+
+async function abrirExpediente(id) {
+  expedienteActivo = id;
+  vista = 'expediente';
+  const { data } = await db.from('pasos').select('*').eq('expediente_id', id).order('fecha', { ascending: false });
+  pasos = data || [];
+  renderMain();
+}
+
+async function crearPaso() {
+  const descripcion = document.getElementById('new-paso-input').value.trim();
+  const tipo = document.getElementById('new-paso-tipo').value;
+  if (!descripcion) return;
+  const { data, error } = await db.from('pasos')
+    .insert({ descripcion, tipo, expediente_id: expedienteActivo })
+    .select().single();
+  if (error) { alert(error.message); return; }
+  pasos.unshift(data);
+  document.getElementById('new-paso-input').value = '';
+  renderMain();
+}
+
+async function eliminarPaso(id, event) {
+  event.stopPropagation();
+  const ok = confirm('¿Eliminar este paso anotado? No se puede deshacer.');
+  if (!ok) return;
+  const { error } = await db.from('pasos').delete().eq('id', id);
+  if (error) { alert(error.message); return; }
+  pasos = pasos.filter(p => p.id !== id);
+  renderMain();
+}
+
+async function togglePaso(id) {
+  const paso = pasos.find(p => p.id === id);
+  const nuevoEstado = paso.estado === 'pendiente' ? 'realizado' : 'pendiente';
+  const { error } = await db.from('pasos').update({ estado: nuevoEstado }).eq('id', id);
+  if (error) { alert(error.message); return; }
+  paso.estado = nuevoEstado;
+  renderMain();
+  if (vista === 'pendientes') verPendientes();
+}
+
+async function verPendientes() {
+  vista = 'pendientes';
+  clienteActivo = null;
+  expedienteActivo = null;
+  renderSidebarClientes();
+  const { data } = await db
+    .from('pasos')
+    .select('*, expedientes(caratula, id, clientes(nombre, id))')
+    .eq('estado', 'pendiente')
+    .order('fecha', { ascending: true });
+  window._pendientes = data || [];
+  document.getElementById('badge-pendientes').style.display = data && data.length ? 'inline-block' : 'none';
+  document.getElementById('badge-pendientes').textContent = data ? data.length : '0';
+  renderMain();
+}
+
+// ---------- Render ----------
+function renderSidebarClientes() {
+  document.getElementById('nav-pendientes').classList.toggle('active', vista === 'pendientes');
+  const list = document.getElementById('client-list');
+  list.innerHTML = clientes.map(c => `
+    <div class="client-item ${clienteActivo === c.id ? 'active' : ''}" onclick="seleccionarCliente('${c.id}')">
+      <span class="nombre-cliente">${escapeHtml(c.nombre)}</span>
+      <button class="delete-btn" title="Eliminar cliente" onclick="eliminarCliente('${c.id}', '${escapeHtml(c.nombre).replace(/'/g, "\\'")}', event)">✕</button>
+    </div>
+  `).join('') || '<div style="padding:8px 18px;color:var(--muted);font-size:13px">Sin clientes todavía</div>';
+}
+
+function renderMain() {
+  const main = document.getElementById('main');
+
+  if (vista === 'pendientes') {
+    const lista = window._pendientes || [];
+    if (!lista.length) {
+      main.innerHTML = `
+        <div class="main-header"><h2>Pendientes</h2><div class="meta">Todo al día</div></div>
+        <div class="empty-state">No tenés pasos pendientes. Cuando anotes un próximo paso en algún expediente, aparece acá.</div>`;
+      return;
+    }
+    const porCliente = {};
+    lista.forEach(p => {
+      const nombreCliente = p.expedientes?.clientes?.nombre || 'Sin cliente';
+      (porCliente[nombreCliente] = porCliente[nombreCliente] || []).push(p);
+    });
+    main.innerHTML = `
+      <div class="main-header"><h2>Pendientes</h2><div class="meta">${lista.length} paso${lista.length === 1 ? '' : 's'} en total</div></div>
+      ${Object.entries(porCliente).map(([nombre, ps]) => `
+        <div class="pend-group">
+          <h3>${escapeHtml(nombre)}</h3>
+          ${ps.map(p => `
+            <div class="paso-item">
+              <div class="paso-check" onclick="togglePasoDesdePendientes('${p.id}')"></div>
+              <div class="paso-body">
+                <div class="paso-desc">${escapeHtml(p.descripcion)}</div>
+                <div class="paso-meta">
+                  <span>${escapeHtml(p.expedientes?.caratula || '')}</span>
+                  <span class="tag">${p.tipo}</span>
+                  <span>${fechaCorta(p.fecha)}</span>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `).join('')}`;
+    return;
+  }
+
+  if (vista === 'cliente') {
+    const cliente = clientes.find(c => c.id === clienteActivo);
+    main.innerHTML = `
+      <div class="main-header"><h2>${escapeHtml(cliente?.nombre || '')}</h2><div class="meta">${expedientes.length} expediente${expedientes.length === 1 ? '' : 's'}</div></div>
+      <div class="new-form">
+        <input type="text" id="new-exp-caratula" placeholder="Carátula del expediente">
+        <input type="text" id="new-exp-fuero" placeholder="Fuero / juzgado (opcional)" style="max-width:200px">
+        <button onclick="crearExpediente()">Agregar expediente</button>
+      </div>
+      ${expedientes.length ? expedientes.map(e => {
+        const pend = (e.pasos || []).filter(p => p.estado === 'pendiente').length;
+        return `
+        <div class="expediente-row" onclick="abrirExpediente('${e.id}')">
+          <div class="info">
+            <div class="caratula">${escapeHtml(e.caratula)}</div>
+            ${e.fuero ? `<div class="fuero">${escapeHtml(e.fuero)}</div>` : ''}
+          </div>
+          <div class="right">
+            <div class="pend-count">${pend ? pend + ' pendiente' + (pend === 1 ? '' : 's') : ''}</div>
+            <button class="delete-btn" title="Eliminar expediente" onclick="eliminarExpediente('${e.id}', '${escapeHtml(e.caratula).replace(/'/g, "\\'")}', event)">✕</button>
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty-state">Todavía no hay expedientes para este cliente.</div>'}
+    `;
+    return;
+  }
+
+  if (vista === 'expediente') {
+    const exp = expedientes.find(e => e.id === expedienteActivo);
+    main.innerHTML = `
+      <a class="back-link" onclick="seleccionarCliente('${clienteActivo}')">← Volver</a>
+      <div class="main-header"><h2>${escapeHtml(exp?.caratula || '')}</h2><div class="meta">${exp?.fuero ? escapeHtml(exp.fuero) : ''}</div></div>
+      <div class="new-form">
+        <input type="text" id="new-paso-input" placeholder="Anotar paso (ej: solicité el informe / próximo paso: presentar escrito)" onkeydown="if(event.key==='Enter') crearPaso()">
+        <select id="new-paso-tipo">
+          <option value="gestion">Gestión</option>
+          <option value="escrito">Escrito</option>
+          <option value="plazo">Plazo</option>
+          <option value="nota">Nota</option>
+        </select>
+        <button onclick="crearPaso()">Anotar</button>
+      </div>
+      ${pasos.length ? pasos.map(p => `
+        <div class="paso-item">
+          <div class="paso-check ${p.estado === 'realizado' ? 'done' : ''}" onclick="togglePaso('${p.id}')">${p.estado === 'realizado' ? '✓' : ''}</div>
+          <div class="paso-body">
+            <div class="paso-desc ${p.estado === 'realizado' ? 'done' : ''}">${escapeHtml(p.descripcion)}</div>
+            <div class="paso-meta">
+              <span class="tag">${p.tipo}</span>
+              <span>${fechaCorta(p.fecha)}</span>
+            </div>
+          </div>
+          <button class="delete-btn" title="Eliminar paso" onclick="eliminarPaso('${p.id}', event)">✕</button>
+        </div>
+      `).join('') : '<div class="empty-state">Sin pasos anotados todavía.</div>'}
+    `;
+    return;
+  }
+}
+
+async function togglePasoDesdePendientes(id) {
+  const { error } = await db.from('pasos').update({ estado: 'realizado' }).eq('id', id);
+  if (error) { alert(error.message); return; }
+  verPendientes();
+}
+
+// ---------- Helpers ----------
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function fechaCorta(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+init();
+</script>
+</body>
+</html>
