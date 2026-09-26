@@ -479,20 +479,14 @@ let expedienteActivo = null;
 let vista = 'pendientes'; // 'pendientes' | 'cliente' | 'expediente'
 
 // ---------- Config / bootstrap ----------
+// Config de Supabase incorporada — cualquier persona que abra el link entra directo al login.
+// La anon key es segura de exponer así: las políticas de seguridad (RLS) en Supabase
+// hacen que cada usuario solo pueda ver y modificar sus propios datos.
+const SUPABASE_URL = 'https://jfjchprnmffgtnpwwppz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmamNocHJubWZmZ3RucHd3cHB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNzcyMTEsImV4cCI6MjEwNTk1MzIxMX0._YfUKy6ILTnLbKRKQaX7ykX-2qUpNs_CiUAXodrmKbA';
+
 function init() {
-  const url = localStorage.getItem('lg_supabase_url');
-  const key = localStorage.getItem('lg_supabase_key');
-  if (!url || !key) {
-    show('setup-screen');
-    return;
-  }
-  try {
-    db = window.supabase.createClient(url, key);
-  } catch (e) {
-    show('setup-screen');
-    document.getElementById('setup-error').textContent = 'Error al conectar: revisá los datos.';
-    return;
-  }
+  db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   db.auth.getSession().then(({ data }) => {
     session = data.session;
     if (session) {
