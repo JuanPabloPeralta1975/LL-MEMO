@@ -226,14 +226,25 @@
   }
   .add-client-row {
     padding: 8px 18px 16px;
+    display: flex;
+    gap: 6px;
   }
   .add-client-row input {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     padding: 6px 8px;
     border: 1px solid var(--border);
     border-radius: 3px;
     font-size: 13px;
     background: var(--cream);
+  }
+  .add-client-row button {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    background: var(--navy);
+    color: white;
+    border-radius: 3px;
+    font-size: 13px;
   }
   .sidebar-bottom {
     margin-top: auto;
@@ -507,6 +518,7 @@
     <div id="client-list"></div>
     <div class="add-client-row">
       <input type="text" id="new-client-input" placeholder="+ Nuevo cliente" onkeydown="if(event.key==='Enter') crearCliente()">
+      <button onclick="crearCliente()">Agregar</button>
     </div>
 
     <div class="sidebar-bottom">
