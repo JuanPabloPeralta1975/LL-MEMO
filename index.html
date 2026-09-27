@@ -247,9 +247,16 @@
   .sidebar-bottom button:hover { color: var(--ink); }
 
   /* ---- Main panel ---- */
+  .main-col {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
   .main {
     overflow-y: auto;
     padding: 32px 40px 60px;
+    flex: 1;
   }
   .main-header {
     margin-bottom: 26px;
@@ -384,10 +391,51 @@
     font-weight: 600;
   }
 
+  .mobile-topbar {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    border-bottom: 1px solid var(--border);
+    background: var(--paper);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .mobile-topbar .menu-btn {
+    font-size: 20px;
+    line-height: 1;
+    padding: 4px 8px;
+    color: var(--navy);
+  }
+  .mobile-topbar .mt-title {
+    font-family: 'Source Serif 4', serif;
+    font-size: 16px;
+    color: var(--navy);
+  }
+  .sidebar-close {
+    display: none;
+  }
+
   @media (max-width: 720px) {
     .app.active { grid-template-columns: 1fr; }
     .sidebar { display: none; }
-    .sidebar.mobile-visible { display: flex; position: fixed; inset: 0; z-index: 10; }
+    .sidebar.mobile-visible {
+      display: flex;
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .sidebar-close {
+      display: block;
+      font-size: 20px;
+      color: var(--muted);
+      padding: 4px 8px;
+    }
+    .mobile-topbar { display: flex; }
     .main { padding: 20px; }
   }
 
@@ -442,9 +490,12 @@
 <!-- ============ MAIN APP ============ -->
 <div class="app" id="app">
   <div class="sidebar" id="sidebar">
-    <div class="sidebar-top">
-      <h1>Expedientes</h1>
-      <div class="who" id="who-label"></div>
+    <div class="sidebar-top" style="display:flex; align-items:flex-start; justify-content:space-between;">
+      <div>
+        <h1>Expedientes</h1>
+        <div class="who" id="who-label"></div>
+      </div>
+      <button class="sidebar-close" onclick="closeSidebarMobile()">✕</button>
     </div>
 
     <div class="nav-item" id="nav-pendientes" onclick="verPendientes()">
@@ -463,7 +514,13 @@
     </div>
   </div>
 
-  <div class="main" id="main"></div>
+  <div class="main-col">
+    <div class="mobile-topbar">
+      <button class="menu-btn" onclick="openSidebarMobile()">☰</button>
+      <div class="mt-title" id="mobile-title">Expedientes</div>
+    </div>
+    <div class="main" id="main"></div>
+  </div>
 </div>
 
 <script>
@@ -611,6 +668,7 @@ async function seleccionarCliente(id) {
   vista = 'cliente';
   expedienteActivo = null;
   renderSidebarClientes();
+  closeSidebarMobile();
   const { data } = await db.from('expedientes').select('*, pasos(estado)').eq('cliente_id', id).order('created_at', { ascending: false });
   expedientes = data || [];
   renderMain();
@@ -689,6 +747,7 @@ async function verPendientes() {
   clienteActivo = null;
   expedienteActivo = null;
   renderSidebarClientes();
+  closeSidebarMobile();
   const { data } = await db
     .from('pasos')
     .select('*, expedientes(caratula, id, clientes(nombre, id))')
@@ -701,6 +760,13 @@ async function verPendientes() {
 }
 
 // ---------- Render ----------
+function openSidebarMobile() {
+  document.getElementById('sidebar').classList.add('mobile-visible');
+}
+function closeSidebarMobile() {
+  document.getElementById('sidebar').classList.remove('mobile-visible');
+}
+
 function renderSidebarClientes() {
   document.getElementById('nav-pendientes').classList.toggle('active', vista === 'pendientes');
   const list = document.getElementById('client-list');
@@ -714,6 +780,12 @@ function renderSidebarClientes() {
 
 function renderMain() {
   const main = document.getElementById('main');
+  const mt = document.getElementById('mobile-title');
+  if (mt) {
+    if (vista === 'pendientes') mt.textContent = 'Pendientes';
+    else if (vista === 'cliente') mt.textContent = clientes.find(c => c.id === clienteActivo)?.nombre || 'Expedientes';
+    else if (vista === 'expediente') mt.textContent = expedientes.find(e => e.id === expedienteActivo)?.caratula || 'Expediente';
+  }
 
   if (vista === 'pendientes') {
     const lista = window._pendientes || [];
